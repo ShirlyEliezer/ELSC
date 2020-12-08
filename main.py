@@ -81,8 +81,8 @@ def predict_R1_from_iron(data, lipid=-1):
     score = float("{:.2f}".format(reg.score(data[['iron']], data.R1)))
     plt.title(title + '\nCoefficient of determination: ' + str(score))
     plt.legend(handles=scatter.legend_elements()[0], labels=labels)
-    plt.savefig('reg_R1_iron_lipid_' + str(lipid) + ' free_iron.png')
     plt.show()
+    compare_prediction_to_data(reg, data, lipid)
 
 
 def get_sliced_data(data, columns):
@@ -95,12 +95,25 @@ def get_sliced_data(data, columns):
     return data[columns]
 
 
+def compare_prediction_to_data(regression_model, data, lipid):
+    plt.xlabel('R1 Measured')
+    plt.ylabel('R1 Predicted')
+
+    y = data.R1
+    predicted = regression_model.predict(data[['iron']])
+    plt.scatter(y, predicted)
+    plt.plot([y.min(), y.max()], [y.min(), y.max()], 'k--', lw=4)
+    plt.title("R1 measured vs. R1 predicted")
+    plt.show()
+
+
 if __name__ == '__main__':
     df = read_data()
-    data = get_data_by_iron_type(df, FREE_IRON)
+    data = get_data_by_iron_type(df, FERRITIN_TRANSFERRIN)
     lipid_amount = np.unique(np.array(data['lipid']))
     for lipid in lipid_amount:
         df = data.loc[data['lipid'] == lipid]
         predict_R1_from_iron(df, lipid)
 
     predict_R1_from_iron(data)
+
