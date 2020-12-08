@@ -5,6 +5,7 @@ from plotnine import ggplot, aes, geom_line, geom_point, ggtitle, scale_color_ma
     scale_color_grey, theme_classic, theme, guides, guide_legend, scale_fill_manual, labs, xlab, \
     facet_wrap, ggsave
 from sklearn import linear_model
+import seaborn as sns
 
 # -------------------- CONSTANTS --------------------
 PATH_TO_DATA = "phantom_table.xlsx"
@@ -56,7 +57,7 @@ def get_data_by_iron_type(data, type):
     return data[data.type.str.contains('Ferritin|Transferrin')]
 
 
-def predict_R1(data, lipid=-1):
+def predict_R1_from_iron(data, lipid=-1):
     """
     the function predicts R1 accordind to iron values.
     :param data: data containing the training set
@@ -77,7 +78,8 @@ def predict_R1(data, lipid=-1):
     else:
         labels = ['lipid 0.0', 'lipid 10.0', 'lipid 17.5', 'lipid 25.0']
         title = TITLE + "lipid amount = 0.0, 10.0, 17.5, 25.0"
-    plt.title(title)
+    score = float("{:.2f}".format(reg.score(data[['iron']], data.R1)))
+    plt.title(title + '\nCoefficient of determination: ' + str(score))
     plt.legend(handles=scatter.legend_elements()[0], labels=labels)
     plt.savefig('reg_R1_iron_lipid_' + str(lipid) + ' free_iron.png')
     plt.show()
@@ -99,6 +101,6 @@ if __name__ == '__main__':
     lipid_amount = np.unique(np.array(data['lipid']))
     for lipid in lipid_amount:
         df = data.loc[data['lipid'] == lipid]
-        predict_R1(df, lipid)
+        predict_R1_from_iron(df, lipid)
 
-    predict_R1(data)
+    predict_R1_from_iron(data)
