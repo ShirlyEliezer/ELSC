@@ -11,6 +11,7 @@ PATH_TO_DATA = "phantom_table.xlsx"
 DEFAULT_X = 'iron concentration'
 FERRITIN_TRANSFERRIN = 1
 FREE_IRON = 0
+TITLE = "Predict R1 according to iron concentration\n"
 
 
 # -------------------- FUNCTIONS --------------------
@@ -55,16 +56,30 @@ def get_data_by_iron_type(data, type):
     return data[data.type.str.contains('Ferritin|Transferrin')]
 
 
-def predict_R1(data):
+def predict_R1(data, lipid=-1):
     """
     the function predicts R1 accordind to iron values.
     :param data: data containing the training set
+    :param lipid: represent the lipid amount in the data.
+    value 0 represent all lipids amount, i.e 10.0, 17.5, 25.0
     :return: prediction of R1 according to iron
     """
-    # plot the data before prediction
+    data = get_sliced_data(data, ['iron', 'R1', 'lipid'])
+    reg = linear_model.LinearRegression()
+    reg.fit(data[['iron']], data.R1)
     plt.xlabel('iron')
     plt.ylabel('R1')
-    plt.scatter(data.iron, data.R1, color='red', marker='+')
+    scatter = plt.scatter(data.iron, data.R1, c=data.lipid, marker='+')
+    plt.plot(data.iron, reg.predict(data[['iron']]), color='blue')
+    if lipid != -1:
+        labels = ['lipid ' + str(lipid)]
+        title = TITLE + "lipid amount = " + str(lipid)
+    else:
+        labels = ['lipid 0.0', 'lipid 10.0', 'lipid 17.5', 'lipid 25.0']
+        title = TITLE + "lipid amount = 0.0, 10.0, 17.5, 25.0"
+    plt.title(title)
+    plt.legend(handles=scatter.legend_elements()[0], labels=labels)
+    plt.savefig('reg_R1_iron_lipid_' + str(lipid) + ' free_iron.png')
     plt.show()
 
 
@@ -80,8 +95,10 @@ def get_sliced_data(data, columns):
 
 if __name__ == '__main__':
     df = read_data()
-    data = get_data_by_iron_type(df, FERRITIN_TRANSFERRIN)
-    data = data[data['lipid'] == 10.0]
-    print(data)
-    data = get_sliced_data(data, ['iron', 'R1'])
+    data = get_data_by_iron_type(df, FREE_IRON)
+    lipid_amount = np.unique(np.array(data['lipid']))
+    for lipid in lipid_amount:
+        df = data.loc[data['lipid'] == lipid]
+        predict_R1(df, lipid)
+
     predict_R1(data)
