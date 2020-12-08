@@ -1,11 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from plotnine import ggplot, aes, geom_line, geom_point, ggtitle, scale_color_manual, \
-    scale_color_grey, theme_classic, theme, guides, guide_legend, scale_fill_manual, labs, xlab, \
-    facet_wrap, ggsave
+from plotnine import ggplot, aes, geom_line, geom_point, ggtitle, theme, xlab
 from sklearn import linear_model
-import seaborn as sns
 
 # -------------------- CONSTANTS --------------------
 PATH_TO_DATA = "phantom_table.xlsx"
@@ -16,45 +13,39 @@ TITLE = "Predict R1 according to iron concentration\n"
 
 
 # -------------------- FUNCTIONS --------------------
-
-
-def read_data():
-    df = pd.read_excel(PATH_TO_DATA)
-    return df
-
-
 def view(df, lipid_name, x_lab, y):
+    """
+    this function plots the data
+    """
     df_sub_1 = df.loc[df['type'] == lipid_name]
     g = ggplot(data=df_sub_1, mapping=aes(x='iron', y=y, group='lipid', colour='lipid')) \
         + geom_point() + geom_line()
     g = g + theme(legend_position=(0.95, 0.6)) + xlab(x_lab) + ggtitle(str(lipid_name))
-
-    # file_name = lipid_name + "_" + y + ".png"
-    # ggsave(plot=g, filename=file_name, path="figure")
-
     print(g)
 
 
-def view_graphs(data):
-    data.lipid = data.lipid.astype(str)
-    lipid_type = np.unique(np.array(data['type']))
-    y_var = ['R1', 'R2', 'R2s', 'MT']
-    for y in y_var:
-        for lipid in lipid_type:
-            if 'Ferritin' in lipid:
-                view(data, lipid, 'Ferritin', y)
-            elif 'Transferrin' in lipid:
-                view(data, lipid, 'Transferrin', y)
-            else:
-                view(data, lipid, DEFAULT_X, y)
-
-
 def get_data_by_iron_type(data, type):
+    """
+    return the rows in the data that the lipid type in them match the type parameter.
+    :param data: data to manipulate
+    :param type: type of lipid
+    :return: sliced data
+    """
     # get the data of all the free iron
     if type == FREE_IRON:
         return data[data.type.str.contains('Fe|Iron') & (data.type.str.contains('Ferritin|Transferrin') == False)]
     # return the data containing Transferrin or Ferritin
     return data[data.type.str.contains('Ferritin|Transferrin')]
+
+
+def get_sliced_data(data, columns):
+    """
+    the function returns subset of the data according to the columns received as input
+    :param data: original data
+    :param columns: list of columns
+    :return: sliced dataframe
+    """
+    return data[columns]
 
 
 def predict_R1_from_iron(data, lipid=-1):
@@ -85,22 +76,18 @@ def predict_R1_from_iron(data, lipid=-1):
     compare_prediction_to_data(reg, data, lipid)
 
 
-def get_sliced_data(data, columns):
-    """
-    the function returns subset of the data according to the columns received as input
-    :param data: original data
-    :param columns: list of columns
-    :return: sliced dataframe
-    """
-    return data[columns]
-
-
 def compare_prediction_to_data(regression_model, data, lipid):
-    plt.xlabel('R1 Measured')
-    plt.ylabel('R1 Predicted')
-
+    """
+    this function comapre between the predicted data and the measured one.
+    :param regression_model: linear regression model which predict the values
+    :param data: data to predict from
+    :param lipid: amount of lipid
+    """
     y = data.R1
     predicted = regression_model.predict(data[['iron']])
+
+    plt.xlabel('R1 Measured')
+    plt.ylabel('R1 Predicted')
     plt.scatter(y, predicted)
     plt.plot([y.min(), y.max()], [y.min(), y.max()], 'k--', lw=4)
     plt.title("R1 measured vs. R1 predicted")
@@ -108,7 +95,7 @@ def compare_prediction_to_data(regression_model, data, lipid):
 
 
 if __name__ == '__main__':
-    df = read_data()
+    df = pd.read_excel(PATH_TO_DATA)
     data = get_data_by_iron_type(df, FERRITIN_TRANSFERRIN)
     lipid_amount = np.unique(np.array(data['lipid']))
     for lipid in lipid_amount:
@@ -116,4 +103,3 @@ if __name__ == '__main__':
         predict_R1_from_iron(df, lipid)
 
     predict_R1_from_iron(data)
-
