@@ -2,7 +2,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from plotnine import ggplot, aes, geom_line, geom_point, ggtitle, theme, xlab
-from sklearn import linear_model
+from sklearn.metrics import r2_score
+from sklearn.model_selection import LeaveOneOut, cross_val_score, cross_val_predict
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from numpy import mean
+from numpy import absolute
+from numpy import sqrt
+import sklearn
 
 # -------------------- CONSTANTS --------------------
 PATH_TO_DATA = "phantom_table.xlsx"
@@ -53,11 +60,11 @@ def predict_R1_from_iron(data, lipid=-1):
     the function predicts R1 accordind to iron values.
     :param data: data containing the training set
     :param lipid: represent the lipid amount in the data.
-    value 0 represent all lipids amount, i.e 10.0, 17.5, 25.0
+    value -1 represent all lipids amount, i.e 10.0, 17.5, 25.0
     :return: prediction of R1 according to iron
     """
     data = get_sliced_data(data, ['iron', 'R1', 'lipid'])
-    reg = linear_model.LinearRegression()
+    reg = LinearRegression()
     reg.fit(data[['iron']], data.R1)
     plt.xlabel('iron')
     plt.ylabel('R1')
@@ -73,18 +80,18 @@ def predict_R1_from_iron(data, lipid=-1):
     plt.title(title + '\nCoefficient of determination: ' + str(score))
     plt.legend(handles=scatter.legend_elements()[0], labels=labels)
     plt.show()
-    compare_prediction_to_data(reg, data, lipid)
+    compare_prediction_to_data(reg, data, 'iron')
 
 
-def compare_prediction_to_data(regression_model, data, lipid):
+def compare_prediction_to_data(regression_model, data, predictor):
     """
     this function comapre between the predicted data and the measured one.
     :param regression_model: linear regression model which predict the values
     :param data: data to predict from
-    :param lipid: amount of lipid
+    :param predictor: predictor of the model
     """
     y = data.R1
-    predicted = regression_model.predict(data[['iron']])
+    predicted = regression_model.predict(data[[str(predictor)]])
 
     plt.xlabel('R1 Measured')
     plt.ylabel('R1 Predicted')
@@ -103,12 +110,78 @@ def predict_R1(data):
     predict_R1_from_iron(data)
 
 
+# cross validation
+def leave_one_out(data):
+    """
+    This function performs cross validation using 'leave one out' method.
+    :param data: data to train and test
+    :return: -
+    """
+    # define predictor and response variables
+    X = np.array(data['iron']).reshape(-1, 1)
+    y = np.array(data['R1'])
+
+    # define cross-validation method to use
+    cv = LeaveOneOut()
+    # build multiple linear regression model
+    model = LinearRegression()
+
+    # use LOOCV to evaluate model
+    scores = cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=cv, n_jobs=-1)
+    predictions = cross_val_predict(model, X, y, cv=cv)
+    scatter = plt.scatter(y, predictions, c=data.lipid, marker='+')
+    accuracy = r2_score(y, predictions)
+    plt.title("Accuracy: " + str(accuracy))
+    plt.show()
+    # the lower the MAE, the more closely a model is able to predict the actual observations.
+    mse = mean(absolute(scores))
+    print(mse)
+
+
+def predict_R1_from_lipid_amount(data, iron =- 1):
+    """
+    the function predicts R1 accordind to lipid amounts.
+    :param data: data containing the training set
+    :return: prediction of R1 according to lipid amount
+    """
+    data = get_sliced_data(data, ['iron', 'R1', 'lipid'])
+    reg = LinearRegression()
+    reg.fit(data[['lipid']], data.R1)
+    plt.xlabel('lipid')
+    plt.ylabel('R1')
+    scatter = plt.scatter(data.lipid, data.R1, c=data.iron, marker='+')
+    plt.plot(data.lipid, reg.predict(data[['lipid']]), color='blue')
+    if iron != -1:
+        labels = ['iron ' + str(iron)]
+        title = TITLE + "iron concentration = " + str(iron)
+    else:
+        labels = [str(iron) for iron in np.unique(np.array(data['iron']))]
+        title = TITLE + "iron concentration = " + " ".join([str(label) for label in labels])
+    score = float("{:.2f}".format(reg.score(data[['lipid']], data.R1)))
+    plt.title(title + '\nCoefficient of determination: ' + str(score))
+    plt.legend(handles=scatter.legend_elements()[0], labels=labels)
+    plt.show()
+    compare_prediction_to_data(reg, data, 'lipid')
+
+
+def predict_R1_lipid(data):
+    iron_con = np.unique(np.array(data['iron']))
+    for iron in iron_con:
+        df = data.loc[data['iron'] == iron]
+        predict_R1_from_lipid_amount(df, iron)
+
+    predict_R1_from_lipid_amount(data)
+
+
 if __name__ == '__main__':
-    # pre-processing of the daTA
+    # pre-processing of the data
     df = pd.read_excel(PATH_TO_DATA)
     data_ferritin_transferrin = get_data_by_iron_type(df, FERRITIN_TRANSFERRIN)
     data_iron = get_data_by_iron_type(df, FREE_IRON)
     # predict R1
-    predict_R1(data_ferritin_transferrin)
+    # predict_R1(data_ferritin_transferrin)
     predict_R1(data_iron)
+    # leave_one_out(data_iron)
+    predict_R1_lipid(data_iron)
+    # pc-sm
 
