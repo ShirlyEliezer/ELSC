@@ -94,12 +94,21 @@ def compare_prediction_to_data(regression_model, data, lipid):
     plt.show()
 
 
-if __name__ == '__main__':
-    df = pd.read_excel(PATH_TO_DATA)
-    data = get_data_by_iron_type(df, FERRITIN_TRANSFERRIN)
+def predict_R1(data):
     lipid_amount = np.unique(np.array(data['lipid']))
     for lipid in lipid_amount:
         df = data.loc[data['lipid'] == lipid]
         predict_R1_from_iron(df, lipid)
 
     predict_R1_from_iron(data)
+
+
+if __name__ == '__main__':
+    # pre-processing of the daTA
+    df = pd.read_excel(PATH_TO_DATA)
+    data_ferritin_transferrin = get_data_by_iron_type(df, FERRITIN_TRANSFERRIN)
+    data_iron = get_data_by_iron_type(df, FREE_IRON)
+    # predict R1
+    predict_R1(data_ferritin_transferrin)
+    predict_R1(data_iron)
+
