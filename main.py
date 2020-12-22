@@ -169,7 +169,7 @@ def cross_val_multy_predictors(data, vars, target):
     return X,y
 
 
-def cross_val_prediction(data, vars, target):
+def cross_val_prediction_helper(data, vars, target):
     """
     This function performs cross validation using 'leave one out' method.
     The function predicts the target variable using one or several predictors.
@@ -198,7 +198,7 @@ def cross_val_prediction(data, vars, target):
     for pred in vars:
         predictors += labels[pred] + ", "
     predictors = predictors[:len(predictors)-2]
-    plt.title("R1 measured vs. R1 predicted\n"
+    plt.title(str(target) + " measured vs. " + str(target) + " predicted\n"
               "predictors: " + predictors + "\n"
               "Accuracy: " + str(float("{:.2f}".format(accuracy))) +
               " Mean absolute squared error: " + str(float("{:.2f}".format(mse))))
@@ -206,12 +206,18 @@ def cross_val_prediction(data, vars, target):
     plt.ylabel('R1 Predicted')
     plt.show()
 
+def cross_val_prediction(data):
+    predictors = [['iron', 'lipid'], ['iron'], ['lipid']]
+    targets = ['R1', 'R2', 'R2s', 'MT', 'MTV']
+    for predictor in predictors:
+        for target in targets:
+            cross_val_prediction_helper(data, predictor, target)
+
 
 if __name__ == '__main__':
     # pre-processing of the data
     df = pd.read_excel(PATH_TO_DATA)
     data_ferritin_transferrin = get_data_by_iron_type(df, FERRITIN_TRANSFERRIN)
     data_iron = get_data_by_iron_type(df, FREE_IRON)
-    cross_val_prediction(data_iron, ['iron', 'lipid'], "R1")
-    print("shirly")
+    cross_val_prediction(data_iron)
 
