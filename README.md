@@ -6,6 +6,6 @@ THe projects contains the next files:
 In this folder can be found comparison between the predicted values and the measured valuse.
 
 close deadline missions :
-1. predict R1 according to lipid amount 
-2. make cross validation 
-3. predict R1 according to lipid amount and iron   
+1. interaction between iron and lipid 
+2. conclude the best model 
+3. lipid type as predictor 
