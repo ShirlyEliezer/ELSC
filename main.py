@@ -8,8 +8,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from numpy import mean
 from numpy import absolute
-from numpy import sqrt
-import sklearn
 
 # -------------------- CONSTANTS --------------------
 PATH_TO_DATA = "phantom_table.xlsx"
@@ -17,7 +15,7 @@ DEFAULT_X = 'iron concentration'
 FERRITIN_TRANSFERRIN = 1
 FREE_IRON = 0
 TITLE = "Predict R1 according to iron concentration\n"
-
+labels = {'iron': 'iron concentration', 'lipid': 'lipid amount', 'type': 'lipid type'}
 
 # -------------------- FUNCTIONS --------------------
 def view(df, lipid_name, x_lab, y):
@@ -110,34 +108,6 @@ def predict_R1(data):
     predict_R1_from_iron(data)
 
 
-# cross validation
-def leave_one_out(data):
-    """
-    This function performs cross validation using 'leave one out' method.
-    :param data: data to train and test
-    :return: -
-    """
-    # define predictor and response variables
-    X = np.array(data['iron']).reshape(-1, 1)
-    y = np.array(data['R1'])
-
-    # define cross-validation method to use
-    cv = LeaveOneOut()
-    # build multiple linear regression model
-    model = LinearRegression()
-
-    # use LOOCV to evaluate model
-    scores = cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=cv, n_jobs=-1)
-    predictions = cross_val_predict(model, X, y, cv=cv)
-    scatter = plt.scatter(y, predictions, c=data.lipid, marker='+')
-    accuracy = r2_score(y, predictions)
-    plt.title("Accuracy: " + str(accuracy))
-    plt.show()
-    # the lower the MAE, the more closely a model is able to predict the actual observations.
-    mse = mean(absolute(scores))
-    print(mse)
-
-
 def predict_R1_from_lipid_amount(data, iron =- 1):
     """
     the function predicts R1 accordind to lipid amounts.
@@ -173,17 +143,75 @@ def predict_R1_lipid(data):
     predict_R1_from_lipid_amount(data)
 
 
+# cross validation
+def cross_val_single_predictor(data, predictor, target):
+    """
+    This function returns predictor values, and target values according to existing data.
+    The function should be called when pre-processing of regression with single predictor.
+    """
+    # define predictor and response variables
+    X = np.array(data[predictor]).reshape(-1, 1)
+    y = np.array(data[target])
+
+    return X, y
+
+
+def cross_val_multy_predictors(data, vars, target):
+    """
+    This function returns predictors values, and target values according to existing data.
+    The function should be called when pre-processing of regression with several predictors.
+    """
+    features = vars
+    # define predictor and response variables
+    X = np.array(data[features]).reshape(-1, len(features))
+    y = np.array(data[target])
+
+    return X,y
+
+
+def cross_val_prediction(data, vars, target):
+    """
+    This function performs cross validation using 'leave one out' method.
+    The function predicts the target variable using one or several predictors.
+    """
+    # several predictors
+    if len(vars) > 1:
+        X ,y = cross_val_multy_predictors(data, vars, target)
+    # only one predictor
+    else:
+        X, y = cross_val_single_predictor(data, vars, target)
+
+    # define cross-validation method to use
+    cv = LeaveOneOut()
+    # build multiple linear regression model
+    model = LinearRegression()
+
+    # use LOOCV to evaluate model
+    scores = cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=cv, n_jobs=-1)
+    predictions = cross_val_predict(model, X, y, cv=cv)
+    scatter = plt.scatter(y, predictions, c=data.lipid, marker='+')
+    plt.plot([y.min(), y.max()], [y.min(), y.max()], 'k--', lw=2)
+    accuracy = r2_score(y, predictions)
+    # the lower the MAE, the more closely a model is able to predict the actual observations.
+    mse = mean(absolute(scores))
+    predictors = ""
+    for pred in vars:
+        predictors += labels[pred] + ", "
+    predictors = predictors[:len(predictors)-2]
+    plt.title("R1 measured vs. R1 predicted\n"
+              "predictors: " + predictors + "\n"
+              "Accuracy: " + str(float("{:.2f}".format(accuracy))) +
+              " Mean absolute squared error: " + str(float("{:.2f}".format(mse))))
+    plt.xlabel('R1 Measured')
+    plt.ylabel('R1 Predicted')
+    plt.show()
+
+
 if __name__ == '__main__':
     # pre-processing of the data
     df = pd.read_excel(PATH_TO_DATA)
     data_ferritin_transferrin = get_data_by_iron_type(df, FERRITIN_TRANSFERRIN)
     data_iron = get_data_by_iron_type(df, FREE_IRON)
-    # predict R1
-    # predict_R1(data_ferritin_transferrin)
-    predict_R1(data_iron)
-    # leave_one_out(data_iron)
-    predict_R1_lipid(data_iron)
-    # pc-sm
-
+    cross_val_prediction(data_iron, ['iron', 'lipid'], "R1")
     print("shirly")
 
