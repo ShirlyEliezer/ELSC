@@ -15,9 +15,11 @@ DEFAULT_X = 'iron concentration'
 FERRITIN_TRANSFERRIN = 1
 FREE_IRON = 0
 TITLE = "Predict R1 according to iron concentration\n"
-labels = {'iron': 'iron concentration', 'lipid': 'lipid amount', 'type': 'lipid type'}
+labels = {'iron': 'iron concentration', 'lipid': 'lipid amount', 'type': 'lipid type', 'interaction': 'interaction'}
 
 # -------------------- FUNCTIONS --------------------
+
+
 def view(df, lipid_name, x_lab, y):
     """
     this function plots the data
@@ -156,17 +158,24 @@ def cross_val_single_predictor(data, predictor, target):
     return X, y
 
 
-def cross_val_multy_predictors(data, vars, target):
+def cross_val_multy_predictors(data, vars, target, interaction=False):
     """
     This function returns predictors values, and target values according to existing data.
     The function should be called when pre-processing of regression with several predictors.
     """
-    features = vars
-    # define predictor and response variables
-    X = np.array(data[features]).reshape(-1, len(features))
-    y = np.array(data[target])
+    if interaction:
+        # create interaction column
+        interaction_col = np.array(data[vars[0]] * data[vars[1]]).reshape(-1, 1)
+        X = np.array(data[vars[:-1]]).reshape(-1, len(vars) - 1)
+        X = np.hstack((X, interaction_col))
+        y = np.array(data[target])
+    else:
+        features = vars
+        # define predictor and response variables
+        X = np.array(data[features]).reshape(-1, len(features))
+        y = np.array(data[target])
 
-    return X,y
+    return X, y
 
 
 def cross_val_prediction_helper(data, vars, target):
@@ -176,7 +185,10 @@ def cross_val_prediction_helper(data, vars, target):
     """
     # several predictors
     if len(vars) > 1:
-        X ,y = cross_val_multy_predictors(data, vars, target)
+        if vars[-1] == 'interaction':
+            X ,y = cross_val_multy_predictors(data, vars, target, True)
+        else:
+            X ,y = cross_val_multy_predictors(data, vars, target, False)
     # only one predictor
     else:
         X, y = cross_val_single_predictor(data, vars, target)
@@ -205,13 +217,18 @@ def cross_val_prediction_helper(data, vars, target):
     plt.xlabel('R1 Measured')
     plt.ylabel('R1 Predicted')
     plt.show()
+    plt.savefig(str(target) + ' ' + str(predictors) + '.png')
+
+
 
 def cross_val_prediction(data):
-    predictors = [['iron', 'lipid'], ['iron'], ['lipid']]
+    predictors = [['iron'], ['lipid'], ['iron', 'lipid'], ['iron', 'lipid', 'interaction']]
     targets = ['R1', 'R2', 'R2s', 'MT', 'MTV']
     for predictor in predictors:
         for target in targets:
             cross_val_prediction_helper(data, predictor, target)
+
+
 
 
 if __name__ == '__main__':
