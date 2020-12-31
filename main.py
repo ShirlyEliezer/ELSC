@@ -14,6 +14,7 @@ PATH_TO_DATA = "phantom_table.xlsx"
 DEFAULT_X = 'iron concentration'
 FERRITIN_TRANSFERRIN = 1
 FREE_IRON = 0
+IRON = 2
 TITLE = "Predict R1 according to iron concentration\n"
 labels = {'iron': 'iron concentration', 'lipid': 'lipid amount', 'type': 'lipid type', 'interaction': 'interaction'}
 
@@ -39,8 +40,11 @@ def get_data_by_iron_type(data, type):
     :return: sliced data
     """
     # get the data of all the free iron
+    if type == IRON:
+        return data[data.type.str.contains('Fe') & (data.type.str.contains('Ferritin|Transferrin') == False)]
     if type == FREE_IRON:
         return data[data.type.str.contains('Fe|Iron') & (data.type.str.contains('Ferritin|Transferrin') == False)]
+
     # return the data containing Transferrin or Ferritin
     return data[data.type.str.contains('Ferritin|Transferrin')]
 
@@ -201,7 +205,7 @@ def cross_val_prediction_helper(data, vars, target):
     # use LOOCV to evaluate model
     scores = cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=cv, n_jobs=-1)
     predictions = cross_val_predict(model, X, y, cv=cv)
-    scatter = plt.scatter(y, predictions, c=data.lipid, marker='+')
+    scatter = plt.scatter(y, predictions, marker='+')
     plt.plot([y.min(), y.max()], [y.min(), y.max()], 'k--', lw=2)
     accuracy = r2_score(y, predictions)
     # the lower the MAE, the more closely a model is able to predict the actual observations.
@@ -214,9 +218,8 @@ def cross_val_prediction_helper(data, vars, target):
               "predictors: " + predictors + "\n"
               "Accuracy: " + str(float("{:.2f}".format(accuracy))) +
               " Mean absolute squared error: " + str(float("{:.2f}".format(mse))))
-    plt.xlabel('R1 Measured')
-    plt.ylabel('R1 Predicted')
-    plt.savefig(str(target) + ' ' + str(predictors) + '.jpg')
+    plt.xlabel(str(target) + " measured")
+    plt.ylabel(str(target) + " predicted")
     plt.show()
 
 
@@ -229,12 +232,10 @@ def cross_val_prediction(data):
             cross_val_prediction_helper(data, predictor, target)
 
 
-
-
 if __name__ == '__main__':
     # pre-processing of the data
     df = pd.read_excel(PATH_TO_DATA)
     data_ferritin_transferrin = get_data_by_iron_type(df, FERRITIN_TRANSFERRIN)
+    data_iron_without_free = get_data_by_iron_type(df, IRON)
     data_iron = get_data_by_iron_type(df, FREE_IRON)
-    cross_val_prediction(data_iron)
-
+    cross_val_prediction(data_iron_without_free)
