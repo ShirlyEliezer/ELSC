@@ -216,8 +216,8 @@ def cross_val_prediction_helper(data, vars, target):
               " Mean absolute squared error: " + str(float("{:.2f}".format(mse))))
     plt.xlabel('R1 Measured')
     plt.ylabel('R1 Predicted')
+    plt.savefig(str(target) + ' ' + str(predictors) + '.jpg')
     plt.show()
-    plt.savefig(str(target) + ' ' + str(predictors) + '.png')
 
 
 
