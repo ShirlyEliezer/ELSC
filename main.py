@@ -4,10 +4,12 @@ import matplotlib.pyplot as plt
 from plotnine import ggplot, aes, geom_line, geom_point, ggtitle, theme, xlab
 from sklearn.metrics import r2_score
 from sklearn.model_selection import LeaveOneOut, cross_val_score, cross_val_predict
-from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from numpy import mean
 from numpy import absolute
+import matplotlib.markers as markers
+import matplotlib.patches as mpatches
+
 
 # -------------------- CONSTANTS --------------------
 PATH_TO_DATA = "phantom_table.xlsx"
@@ -17,6 +19,15 @@ FREE_IRON = 0
 IRON = 2
 TITLE = "Predict R1 according to iron concentration\n"
 labels = {'iron': 'iron concentration', 'lipid': 'lipid amount', 'type': 'lipid type', 'interaction': 'interaction'}
+
+lipid_amount_dict = {0.0: 'c', 10.0: 'm', 17.5: 'y', 25.0: 'g'}
+labels_legend_dict = {0.0: 'lipid 0.0', 10.0: 'lipid 10.0', 17.5: 'lipid 17.5', 25.0:'lipid 25.0'}
+
+lipid_type_dict = {'PC+Chol+Fe': "+", 'Iron': "x", 'PC+Fe': "|",
+                   'PC+SM+Fe': "_", 'PC+SM+Ferritin': "D", 'Ferritin': "1", 'PC+Ferritin': "2",
+                   'PC+Chol+Ferritin': "3", 'BSA+Ferritin': "4", 'PC+SM+Transferrin':
+                       markers.CARETLEFT, 'Transferrin': markers.CARETRIGHT}
+
 
 # -------------------- FUNCTIONS --------------------
 
@@ -32,22 +43,28 @@ def view(df, lipid_name, x_lab, y):
     print(g)
 
 
-def get_data_by_iron_type(data, type):
+def get_data_by_lipid_type(data, type):
     """
     return the rows in the data that the lipid type in them match the type parameter.
+    The function also add specific marker and color for each lipid type and lipid amount.
     :param data: data to manipulate
     :param type: type of lipid
     :return: sliced data
     """
     # get the data of all the free iron
     if type == IRON:
-        return data[data.type.str.contains('Fe') & (data.type.str.contains('Ferritin|Transferrin') == False)]
-    if type == FREE_IRON:
-        return data[data.type.str.contains('Fe|Iron') & (data.type.str.contains('Ferritin|Transferrin') == False)]
+        cur_data = data[data.type.str.contains('Fe') &
+                        (data.type.str.contains('Ferritin|Transferrin') == False)]
+
+    elif type == FREE_IRON:
+        cur_data = data[data.type.str.contains('Fe|Iron') &
+                        (data.type.str.contains('Ferritin|Transferrin') == False)]
 
     # return the data containing Transferrin or Ferritin
-    return data[data.type.str.contains('Ferritin|Transferrin')]
+    else:
+        cur_data = data[data.type.str.contains('Ferritin|Transferrin')]
 
+    return cur_data
 
 def get_sliced_data(data, columns):
     """
@@ -75,14 +92,14 @@ def predict_R1_from_iron(data, lipid=-1):
     scatter = plt.scatter(data.iron, data.R1, c=data.lipid, marker='+')
     plt.plot(data.iron, reg.predict(data[['iron']]), color='blue')
     if lipid != -1:
-        labels = ['lipid ' + str(lipid)]
+        labels_legend = ['lipid ' + str(lipid)]
         title = TITLE + "lipid amount = " + str(lipid)
     else:
-        labels = ['lipid 0.0', 'lipid 10.0', 'lipid 17.5', 'lipid 25.0']
+        labels_legend = ['lipid 0.0', 'lipid 10.0', 'lipid 17.5', 'lipid 25.0']
         title = TITLE + "lipid amount = 0.0, 10.0, 17.5, 25.0"
     score = float("{:.2f}".format(reg.score(data[['iron']], data.R1)))
     plt.title(title + '\nCoefficient of determination: ' + str(score))
-    plt.legend(handles=scatter.legend_elements()[0], labels=labels)
+    plt.legend(handles=scatter.legend_elements()[0], labels=labels_legend)
     plt.show()
     compare_prediction_to_data(reg, data, 'iron')
 
@@ -128,14 +145,14 @@ def predict_R1_from_lipid_amount(data, iron =- 1):
     scatter = plt.scatter(data.lipid, data.R1, c=data.iron, marker='+')
     plt.plot(data.lipid, reg.predict(data[['lipid']]), color='blue')
     if iron != -1:
-        labels = ['iron ' + str(iron)]
+        labels_legend = ['iron ' + str(iron)]
         title = TITLE + "iron concentration = " + str(iron)
     else:
-        labels = [str(iron) for iron in np.unique(np.array(data['iron']))]
+        labels_legend = [str(iron) for iron in np.unique(np.array(data['iron']))]
         title = TITLE + "iron concentration = " + " ".join([str(label) for label in labels])
     score = float("{:.2f}".format(reg.score(data[['lipid']], data.R1)))
     plt.title(title + '\nCoefficient of determination: ' + str(score))
-    plt.legend(handles=scatter.legend_elements()[0], labels=labels)
+    plt.legend(handles=scatter.legend_elements()[0], labels=labels_legend)
     plt.show()
     compare_prediction_to_data(reg, data, 'lipid')
 
@@ -155,10 +172,10 @@ def cross_val_single_predictor(data, predictor, target):
     This function returns predictor values, and target values according to existing data.
     The function should be called when pre-processing of regression with single predictor.
     """
+
     # define predictor and response variables
     X = np.array(data[predictor]).reshape(-1, 1)
     y = np.array(data[target])
-
     return X, y
 
 
@@ -167,6 +184,7 @@ def cross_val_multy_predictors(data, vars, target, interaction=False):
     This function returns predictors values, and target values according to existing data.
     The function should be called when pre-processing of regression with several predictors.
     """
+
     if interaction:
         # create interaction column
         interaction_col = np.array(data[vars[0]] * data[vars[1]]).reshape(-1, 1)
@@ -187,12 +205,17 @@ def cross_val_prediction_helper(data, vars, target):
     This function performs cross validation using 'leave one out' method.
     The function predicts the target variable using one or several predictors.
     """
+
+    colors = [lipid_amount_dict[lipid] for lipid in data.lipid]
+    markers = [lipid_type_dict[lip_type] for lip_type in data.type]
+
+
     # several predictors
     if len(vars) > 1:
         if vars[-1] == 'interaction':
-            X ,y = cross_val_multy_predictors(data, vars, target, True)
+            X, y = cross_val_multy_predictors(data, vars, target, True)
         else:
-            X ,y = cross_val_multy_predictors(data, vars, target, False)
+            X, y = cross_val_multy_predictors(data, vars, target, False)
     # only one predictor
     else:
         X, y = cross_val_single_predictor(data, vars, target)
@@ -205,23 +228,32 @@ def cross_val_prediction_helper(data, vars, target):
     # use LOOCV to evaluate model
     scores = cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=cv, n_jobs=-1)
     predictions = cross_val_predict(model, X, y, cv=cv)
-    scatter = plt.scatter(y, predictions, marker='+')
+
+    for i in range(len(y)):
+        plt.scatter(y[i], predictions[i], c=colors[i], marker=markers[i])
+    # scatter = plt.scatter(y, predictions, c=colors, marker='+')
     plt.plot([y.min(), y.max()], [y.min(), y.max()], 'k--', lw=2)
+
+    labels_legend = list()
+    for lipid in lipid_amount_dict:
+        labels_legend.append(mpatches.Patch(color=lipid_amount_dict[lipid], label=str(labels_legend_dict[
+            lipid])))
+
+    plt.legend(handles=labels_legend)
     accuracy = r2_score(y, predictions)
     # the lower the MAE, the more closely a model is able to predict the actual observations.
-    mse = mean(absolute(scores))
+    mae = mean(absolute(scores))
     predictors = ""
     for pred in vars:
         predictors += labels[pred] + ", "
     predictors = predictors[:len(predictors)-2]
     plt.title(str(target) + " measured vs. " + str(target) + " predicted\n"
               "predictors: " + predictors + "\n"
-              "Accuracy: " + str(float("{:.2f}".format(accuracy))) +
-              " Mean absolute squared error: " + str(float("{:.2f}".format(mse))))
+              "R^2: " + str(float("{:.2f}".format(accuracy))) +
+              " Mean absolute squared error: " + str(float("{:.2f}".format(mae))))
     plt.xlabel(str(target) + " measured")
     plt.ylabel(str(target) + " predicted")
     plt.show()
-
 
 
 def cross_val_prediction(data):
@@ -235,7 +267,9 @@ def cross_val_prediction(data):
 if __name__ == '__main__':
     # pre-processing of the data
     df = pd.read_excel(PATH_TO_DATA)
-    data_ferritin_transferrin = get_data_by_iron_type(df, FERRITIN_TRANSFERRIN)
-    data_iron_without_free = get_data_by_iron_type(df, IRON)
-    data_iron = get_data_by_iron_type(df, FREE_IRON)
-    cross_val_prediction(data_iron_without_free)
+    data_ferritin_transferrin = get_data_by_lipid_type(df, FERRITIN_TRANSFERRIN)
+    data_iron_without_free = get_data_by_lipid_type(df, IRON)
+    data_iron = get_data_by_lipid_type(df, FREE_IRON)
+
+    # predicting
+    cross_val_prediction(data_iron)
