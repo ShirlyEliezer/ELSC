@@ -9,31 +9,49 @@ from numpy import mean
 from numpy import absolute
 import matplotlib.markers as markers
 import matplotlib.patches as mpatches
-from matplotlib.lines import Line2D
-from pathlib import Path
+import matplotlib.pyplot as plt
+from matplotlib.legend_handler import HandlerBase
 
+# ------------ subclass for markers legend ----------------
+
+class MarkerHandler(HandlerBase):
+    def create_artists(self, legend, tup, xdescent, ydescent, width, height, fontsize, trans):
+        return [plt.Line2D([width/4], [height/4.], ls="", marker=tup[1], color='b',
+                           transform=trans)]
 
 # -------------------- CONSTANTS --------------------
 PATH_TO_DATA = "phantom_table.xlsx"
-DEFAULT_X = 'iron concentration'
-FERRITIN_TRANSFERRIN = 1
-FREE_IRON = 0
-IRON = 2
+DEFAULT_X = 'iron concentration [mg/ml]'
+
+
+NO_FER_TRANS = 0
+IRON = '[Fe] sigma [mg/ml]'
+LIPID = 'lipid [%]'
+R1 = 'R1 [1/sec]'
+R2 = 'R2 [1/sec]'
+R2S = 'R2s [1/sec]'
+MTV = 'MTV [fraction]'
+MT = 'MT [p.u.]'
+
 TITLE = "Predict R1 according to iron concentration\n"
-labels = {'iron': 'iron concentration [mg/ml]', 'lipid': 'lipid amount [%]', 'type': 'lipid type',
-          'interaction': 'interaction', '1-iron': 'iron 1-complement',
+labels = {IRON: 'iron concentration', LIPID: 'lipid amount', 'type': 'lipid type',
+          'interaction': 'iron concentration * lipid amount', '1-iron': 'iron 1-complement',
           '1-lipid': 'lipid 1-complement', 'interaction only': 'pure interaction'}
 
 lipid_amount_dict = {0.0: 'c', 10.0: 'm', 17.5: 'y', 25.0: 'g'}
 labels_legend_dict = {0.0: 'lipid 0.0', 10.0: 'lipid 10.0', 17.5: 'lipid 17.5', 25.0:'lipid 25.0'}
 
-lipid_type_dict = {'PC+Chol+Fe': "+", 'Iron': "x", 'PC+Fe': "|",
-                   'PC+SM+Fe': "_", 'PC+SM+Ferritin': "D", 'Ferritin': "1", 'PC+Ferritin': "2",
-                   'PC+Chol+Ferritin': "3", 'BSA+Ferritin': "4", 'PC+SM+Transferrin':
-                       markers.CARETLEFT, 'Transferrin': markers.CARETRIGHT}
+lipid_type_dict = {'BSA+Ferritin': "+", 'Fe2': "x", 'Fe3': "o",
+                   'PC+Chol+Fe2': "_", 'PC+Chol+Fe3': "D", 'Ferritin': "1", 'PC+Chol+Ferritin': "2",
+                   'PC+Fe2': "3", 'PC+Ferritin': "4", 'PC+SM+Fe2':
+                       markers.CARETLEFT, 'Transferrin': markers.CARETRIGHT,
+                   'PC+SM+Fe3': markers.CARETDOWN, 'PC+SM+Ferritin': markers.CARETUP,
+                   'PC+SM+Transferrin': markers.TICKDOWN}
 
 target_measure_dict = {'R1': '[1/sec]', 'R2s': '[1/sec]', 'R2': '[1/sec]', 'MT': '[p.u.]',
                        'MTV': '[fraction]'}
+
+for_title_dict = {R1: 'R1', R2: 'R2', R2S: 'R2s', MT: 'MT', MTV: 'MTV'}
 
 # -------------------- FUNCTIONS --------------------
 
@@ -57,18 +75,17 @@ def get_data_by_lipid_type(data, type):
     :param type: type of lipid
     :return: sliced data
     """
-    # get the data of all the free iron
-    if type == IRON:
-        cur_data = data[data.type.str.contains('Fe') &
-                        (data.type.str.contains('Ferritin|Transferrin') == False)]
+    # data without ferritin and transfferin
+    if type == NO_FER_TRANS:
+        cur_data = data[data.type.str.contains('Ferritin|Transferrin') == False]
 
-    elif type == FREE_IRON:
-        cur_data = data[data.type.str.contains('Fe|Iron') &
-                        (data.type.str.contains('Ferritin|Transferrin') == False)]
+    # data of all lipid types without free iron
+    elif type == IRON:
+        cur_data = data[data.type.str.contains('Iron') == False]
 
-    # return the data containing Transferrin or Ferritin
+    # get data of free iron
     else:
-        cur_data = data[data.type.str.contains('Ferritin|Transferrin')]
+        cur_data = data[data.type.str.contains('Iron')]
 
     return cur_data
 
@@ -173,7 +190,8 @@ def predict_R1_lipid(data):
     predict_R1_from_lipid_amount(data)
 
 
-# cross validation
+# -------------------------- cross validation ----------------------------
+
 def cross_val_single_predictor(data, predictor, target):
     """
     This function returns predictor values, and target values according to existing data.
@@ -225,8 +243,8 @@ def cross_val_prediction_helper(data, vars, target):
         if vars[-1] == 'interaction':
             X, y = cross_val_multy_predictors(data, vars, target, True)
         elif vars[-1] == 'interaction only':
-            data = data.loc[data['iron'] != 0.00]
-            data = data.loc[data['lipid'] != 0.0]
+            data = data.loc[data[IRON] != 0.00]
+            data = data.loc[data[LIPID] != 0.0]
             X, y = cross_val_multy_predictors(data, vars, target, False, True)
         else:
             X, y = cross_val_multy_predictors(data, vars, target)
@@ -234,15 +252,7 @@ def cross_val_prediction_helper(data, vars, target):
     else:
         X, y = cross_val_single_predictor(data, vars, target)
 
-    colors = [lipid_amount_dict[lipid] for lipid in data.lipid]
-    markers = [lipid_type_dict[type] for type in data.type]
-
-    markers_labels = []
-    types = []
-    for type in lipid_type_dict:
-        if type not in types:
-            types.append(type)
-            markers_labels.append(lipid_type_dict[type])
+    colors, markers, markers_types, markers_labels = get_colors_and_markers(data)
 
     # define cross-validation method to use
     cv = LeaveOneOut()
@@ -252,71 +262,102 @@ def cross_val_prediction_helper(data, vars, target):
     # use LOOCV to evaluate model
     scores = cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=cv, n_jobs=-1)
     predictions = cross_val_predict(model, X, y, cv=cv)
-    marker_type_dict = {}
-    for type, marker in lipid_type_dict.items():
-        marker_type_dict[marker] = type
-
-    color_type_dict = {}
-    for lipid, color in lipid_amount_dict.items():
-        color_type_dict[color] = lipid
 
     plt.figure()
     for i in range(len(y)):
         plt.scatter(y[i], predictions[i], c=colors[i], marker=markers[i])
-    plt.plot([y.min(), y.max()], [y.min(), y.max()], 'k--', lw=2)
+    plt.plot([y.min(), y.max()], [predictions.min(), predictions.max()], 'k--', lw=2)
 
     labels_legend_color = list()
-    for lipid in lipid_amount_dict:
-        labels_legend_color.append(mpatches.Patch(color=lipid_amount_dict[lipid],
-                                                  label=str(labels_legend_dict[lipid])))
-
-    plt.legend(handles=labels_legend_color)
-    # print(markers_labels)
-    # print(types)
-    # plt.gca().add_artist(markers_labels, types)
-
+    # for lipid in lipid_amount_dict:
+    #   labels_legend_color.append(mpatches.Patch(color=lipid_amount_dict[lipid],
+    #                                             label=str(labels_legend_dict[lipid])))
     #
-    # legend_elements = []
-    # for marker in set_markers:
-    #     legend_elements.append(Line2D([0], [0], marker=marker, label=marker_type_dict[marker]))
-
-    # plt.legend([label for label in set(labels)])
+    # legend1 = plt.legend(list(zip(colors, markers_types)), markers_labels,
+    #         handler_map={tuple: MarkerHandler()}, loc=4)
+    # plt.legend(handles=labels_legend_color, loc=2)
+    # plt.gca().add_artist(legend1)
 
     accuracy = r2_score(y, predictions)
     # the lower the MAE, the more closely a model is able to predict the actual observations.
     mae = mean(absolute(scores))
+    coeff = ['a', 'b', 'c', 'd']
     predictors = ""
-    for pred in vars:
-        predictors += labels[pred] + ", "
-    predictors = predictors[:len(predictors)-2]
-    plt.title(str(target) + " measured vs. " + str(target) + " predicted\n"
-              "predictors: " + predictors + "\n"
-              "R^2: " + str(float("{:.2f}".format(accuracy))) +
-              " Mean absolute squared error: " + str(float("{:.2f}".format(mae))))
-    plt.xlabel(str(target) + target_measure_dict[target] + " measured")
-    plt.ylabel(str(target) + target_measure_dict[target] + " predicted")
-    fig_name = str(target) + "_" + str(predictors)
-    plt.savefig(fname=fig_name, format='png')
+    if 'interaction only' in vars:
+        predictors = 'a * ' + labels['interaction']
+    else:
+        for i in range(0, len(vars)):
+            if coeff[i] == 'c':
+                predictors += '\n' + str(coeff[i]) + ' * ' + str(labels[vars[i]]) + ' + '
+            else:
+                predictors += str(coeff[i]) + ' * ' + str(labels[vars[i]]) + ' + '
+        predictors = predictors[:len(predictors)-2]
+    plt.title(str(for_title_dict[target]) + ' = ' + predictors + "\n"
+              "R^2: " + str(float("{:.3f}".format(accuracy))) +
+              " Mean absolute squared error: " + str(float("{:.3f}".format(mae))))
+    plt.xlabel(str(target) + " measured")
+    plt.ylabel(str(target) + " predicted")
+    plt.xlim([0.05, 0.3])
+    plt.ylim([0.225, 0.23])
     plt.show()
 
 
-
 def cross_val_prediction(data):
-    predictors = [['iron'], ['lipid'], ['iron', 'lipid'], ['iron', 'lipid', 'interaction'],
-                  ['iron', 'lipid', 'interaction only']]
-    targets = ['R1', 'R2', 'R2s', 'MT', 'MTV']
-    for predictor in predictors:
-        for target in targets:
+    predictors = [[IRON], [LIPID],  [IRON, LIPID], [IRON, LIPID, 'interaction'], [IRON, LIPID, 'interaction only']]
+    targets = [R1, R2, R2S, MT, MTV]
+    for target in targets:
+        for predictor in predictors:
             cross_val_prediction_helper(data, predictor, target)
+
+
+def pre_processing():
+    data = pd.read_excel(PATH_TO_DATA)
+    # ignore experiments 6 and 11
+    data = data[data.ExpNum != 6]
+    data = data[data.ExpNum != 11]
+    # ignore experiments where the lipid type is BSA+Ferritin
+    return data[data.type != 'BSA+Ferritin']
+
+
+def get_colors_and_markers(data):
+    colors = [lipid_amount_dict[lipid] for lipid in data[LIPID]]
+    markers = [lipid_type_dict[type] for type in data.type]
+
+    markers_types = []
+    markers_labels = []
+    for type in np.unique(data.type):
+        if type not in markers_labels:
+            markers_labels.append(type)
+            markers_types.append(lipid_type_dict[type])
+    return colors, markers, markers_types, markers_labels
+
+
+def parameter_fe_plot(data):
+    colors, markers, markers_types, markers_labels = get_colors_and_markers(data)
+    qmri_parameters = np.asarray(data.columns[2:7])
+    x_axis = data['lipid [%]']
+    for parameter in qmri_parameters:
+        y_axis = data[parameter]
+        fig, ax = plt.subplots()
+        for xp, yp, c, m in zip(x_axis, y_axis, colors, markers):
+            ax.scatter([xp], [yp], c=c, marker=m)
+
+        plt.ylabel('{0}'.format(str(parameter)))
+        plt.xlabel('lipid [%]')
+        labels_legend_color = list()
+        for lipid in lipid_amount_dict:
+            labels_legend_color.append(mpatches.Patch(color=lipid_amount_dict[lipid],
+                                                      label=str(labels_legend_dict[lipid])))
+        plt.legend(handles=labels_legend_color, loc='best')
+
+        plt.show()
 
 
 if __name__ == '__main__':
     # pre-processing of the data
-    df = pd.read_excel(PATH_TO_DATA)
-
-    data_ferritin_transferrin = get_data_by_lipid_type(df, FERRITIN_TRANSFERRIN)
-    data_iron_without_free = get_data_by_lipid_type(df, IRON)
-    data_iron = get_data_by_lipid_type(df, FREE_IRON)
-
+    df = pre_processing()
+    parameter_fe_plot(df)
+    # data = get_data_by_lipid_type(df, 0)
     # predicting
-    cross_val_prediction(data_iron)
+    # cross_val_prediction(df)
+
