@@ -26,22 +26,23 @@ def parameter_iron_lipid_plot(data, iron_lipid):
         plt.show()
 
 
-def cross_val_prediction(data):
+def cross_val_prediction(data, lipid_type):
     predictors = [[IRON, LIPID], [IRON, LIPID, 'interaction'], [IRON, LIPID, 'interaction only']]
     targets = [R1, R2, R2S, MT, MTV]
+    #
     for target in targets:
         for predictor in predictors:
-            cross_val_prediction_helper(data, predictor, target)
+            cross_val_prediction_helper(data, predictor, target, lipid_type)
 
 
 if __name__ == '__main__':
     # pre-processing of the data
     df = pre_processing()
-    for lipid in get_lipids(df):
+    lipids = get_lipids(df)
+    for lipid in lipids:
         data = df[df['Lipid type'] == lipid]
-        data = data[data.type.str.contains(lipid) == True]
         # parameter_iron_lipid_plot(df, IRON)
         # parameter_iron_lipid_plot(df, LIPID)
         # predicting
-        cross_val_prediction(data)
+        cross_val_prediction(data, lipid)
 

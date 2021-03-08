@@ -48,7 +48,7 @@ def cross_val_multy_predictors(data, vars, target, interaction=False, interactio
     return X, y
 
 
-def cross_val_prediction_helper(data, vars, target):
+def cross_val_prediction_helper(data, vars, target, lipid_type):
     """
     This function performs cross validation using 'leave one out' method.
     The function predicts the target variable using one or several predictors.
@@ -117,10 +117,10 @@ def cross_val_prediction_helper(data, vars, target):
     # plt.xlim([0.05, 0.3])
     # plt.ylim([0.225, 0.23])
 
-    # plt.savefig("C:\\Users\\Shirly Eliezer\\Desktop\\university\\third year\\ELSC\\plots\\" +
-    #         ', '.join(vars).replace('[Fe] sigma [mg/ml]', 'iron').replace(' ', '').
-    #         replace('lipid[%]', 'lipid') + '_' + str(target.replace(' ', '')).split('[')[0] +
-    #             ".jpg")
+    plt.savefig("C:\\Users\\Shirly Eliezer\\Desktop\\university\\third year\\ELSC\\plots\\" +
+            ', '.join(vars).replace('[Fe] sigma [mg/ml]', 'iron').replace(' ', '').
+            replace('lipid[%]', 'lipid') + '_' + str(target.replace(' ', '')).split('[')[0] +
+                "_" + str(lipid_type) + ".jpg")
     plt.show()
 
 

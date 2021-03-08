@@ -33,5 +33,7 @@ def pre_processing():
     # ignore experiments where the lipid type is BSA+Ferritin
     data = get_data_without_ferritin_or_transferrin(data)
     data = data[data.type.str.contains('Fe3') == False]
+    # remove data with free iron
+    data = data[data.type != 'Fe2']
     return data[data.type != 'BSA+Ferritin']
 
